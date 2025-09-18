@@ -7,7 +7,7 @@
     <ImageView
             android:id="@+id/iv"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"/>
+            android:layout_height="match_parent" />
 
 
     <TextView
@@ -16,10 +16,24 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content" />
 
-    <Button
-            android:id="@+id/btn_send_data"
-            android:text="传送数据"
+    <LinearLayout
             android:layout_alignParentBottom="true"
+            android:orientation="vertical"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"/>
+            android:layout_height="wrap_content">
+
+        <Button
+                android:id="@+id/btn_connect_server"
+                android:text="连接服务端"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+        <Button
+                android:id="@+id/btn_send_data"
+                android:text="传送数据"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+    </LinearLayout>
+
+
 </RelativeLayout>

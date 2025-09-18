@@ -15,6 +15,8 @@ class P2pBroadcastReceiver(
         val action = intent?.action
         when (action) {
             //一次设备发现开始或结束
+            //设备发现开始，会收到这个广播。
+            //设备发现结束，也会收到这个广播。
             WifiP2pManager.WIFI_P2P_DISCOVERY_CHANGED_ACTION -> {
                 Log.i(TAG, "onReceive() WIFI_P2P_DISCOVERY_CHANGED_ACTION")
                 mOnWIFI_P2P_DISCOVERY_CHANGED_ACTION?.invoke(intent.extras)

@@ -16,17 +16,20 @@ import com.zelin.p2pclient.PermissionManager.REQUEST_CODE_REQUEST_CONNECT_DEVICE
 
 object P2pClientManager {
 
-    private var mIsRequestingConnectionInfo = false
     private var mWifiP2pManager: WifiP2pManager? = null
     private var mWifiP2pChannel: WifiP2pManager.Channel? = null
     private const val TAG = "peerClient/P2pClientManager"
 
     //郑泽霖的redmi k40s的WIFI mac地址
     const val DEVICE_ADDRESS_MAC_REDMI_K40S = "42:68:bd:cb:55:6d"
+//    const val DEVICE_ADDRESS_MAC_REDMI_K40S = "02:00:00:00:00:00"
 
-    //对外
+    //服务端ip地址
     var mRemoteDeviceHostAddress: String? = null
+    //p2p是否已经连接
     var mIsP2pConnected: Boolean = false
+    //避免重复请求group连接信息
+     var mIsRequestingConnectionInfo = false
 
 
     fun init(context: Context) {
@@ -49,111 +52,77 @@ object P2pClientManager {
         if (
             !PermissionManager.isHavePermissions(context, REQUEST_CODE_PEERS_DISCOVERY)
         ) {
+            Log.e(TAG, "beginPeersDiscovery() isHavePermissions false")
             return
         }
         Log.i(TAG, "beginPeersDiscovery() call WifiP2pManager.discoverPeers()")
-        Toast.makeText(context, "开始设备发现", Toast.LENGTH_SHORT)
-            .show()
         if (mWifiP2pChannel != null) {
+            //设备发现
             mWifiP2pManager?.discoverPeers(mWifiP2pChannel, null)
         }
     }
 
+    //查询远程设备列表
+    //实际上我们没有用到这个列表
     @SuppressLint("MissingPermission")
     fun beginPeersRequest(context: Activity) {
         Log.i(TAG, "beginPeersRequest()")
         if (
             !PermissionManager.isHavePermissions(context, REQUEST_CODE_PEERS_REQUEST)
         ) {
+            Log.e(TAG, "beginPeersRequest() isHavePermissions false")
             return
         }
         mWifiP2pChannel?.let {
+            //调用requestPeers()方法，获取远程发现设备的列表
             mWifiP2pManager?.requestPeers(
                 it
-            ) { peers ->
+            ) {
+                //参数是WifiP2pDeviceList对象，包含WifiP2pDevice对象的列表
+                    peers ->
                 Log.i(TAG, "requestPeers() peers: $peers")
             }
         }
     }
 
-    //客户端连接设备，服务端不去连接设备
-    //实际上谁连谁都是可以的
+    //客户端连接设备，服务端不去连接设备。实际上谁连谁都是可以的
     //远程设备
-    //wifiP2pDevice:
-    // Device: Redmi K40S
-    //deviceAddress: 02:00:00:00:00:00
-    //primary type: 10-0050F204-5
-    //secondary type: null
-    //wps: 0
-    //grpcapab: 0
-    //devcapab: 0
-    //status: 3
-    //wfdInfo: null
-    //vendorElements: null
-    //************************************************************
-    //设置界面显示的mac地址：
-    //f8:ab:82:d9:3a:1e
-    //设置界面显示的蓝牙地址：
-    //f8:ab:82:d8:01:9e
-    //************************************************************
-    //p2p扫描到的远程设备信息
-    //Device: Redmi K40S
-    //deviceAddress: 42:68:bd:cb:55:6d
-    //primary type: 10-0050F204-5
-    //secondary type: null
-    //wps: 392
-    //grpcapab: 43
-    //devcapab: 37
-    //status: 3
-    //wfdInfo: WFD enabled: trueWFD DeviceInfo: 0
-    //WFD CtrlPort: 0
-    //WFD MaxThroughput: 0
-    //WFD R2 DeviceInfo: -1
-    //vendorElements: null
     @SuppressLint("MissingPermission")
     fun connectDevice(context: Activity, deviceAddress: String) {
         Log.i(TAG, "connectDevice()")
         if (
             !PermissionManager.isHavePermissions(context, REQUEST_CODE_REQUEST_CONNECT_DEVICE)
         ) {
+            Log.e(TAG, "connectDevice() isHavePermissions false")
             return
         }
         val config = WifiP2pConfig()
         //目标设备的MAC地址
         config.deviceAddress = deviceAddress;
+        Log.i(TAG, "connectDevice() call WifiP2pManager.connect() deviceAddress: ${config.deviceAddress}")
         mWifiP2pChannel?.let {
-            mWifiP2pManager?.connect(it, config, object : ActionListener {
-                override fun onSuccess() {
-                    Log.i(TAG, "connectDevice() onSuccess() 连接成功")
-                    Toast.makeText(context, "连接成功", Toast.LENGTH_SHORT).show()
-                    mIsP2pConnected = true
-                    //请求Group信息
-                    beginRequestConnectionInfo(context)
-                }
-
-                override fun onFailure(reason: Int) {
-                    Log.e(TAG, "connectDevice() onFailure() 连接失败 reason: $reason")
-                    mIsP2pConnected = false
-                }
-            })
+            //连接设备
+            mWifiP2pManager?.connect(it, config, null)
         }
     }
 
     @SuppressLint("MissingPermission")
     fun beginRequestConnectionInfo(activity: Activity) {
         Log.i(TAG, "beginRequestConnectionInfo() ")
-        if(mIsRequestingConnectionInfo){
+        //防止重复请求连接信息
+        if (mIsRequestingConnectionInfo) {
             return
         }
-        mIsRequestingConnectionInfo=true
-        if(mRemoteDeviceHostAddress!=null){
-            return;
+        mIsRequestingConnectionInfo = true
+        if (mRemoteDeviceHostAddress != null) {
+            return
         }
-        // TODO:
         if (
+            //没有权限，请求权限
             !PermissionManager.isHavePermissions(activity, REQUEST_CODE_REQUEST_CONNECTION_INFO)
         ) {
-            mIsRequestingConnectionInfo=false
+            //
+            mIsRequestingConnectionInfo = false
             return
         }
         Toast.makeText(activity, "开始查询Group信息", Toast.LENGTH_SHORT).show()
@@ -163,28 +132,38 @@ object P2pClientManager {
                 Log.i(TAG, "beginRequestConnectionInfo() wifiP2pInfo：$wifiP2pInfo")
                 if (wifiP2pInfo == null) {
                     Log.e(TAG, "beginRequestConnectionInfo() wifiP2pInfo is null! ")
+                    //
                     mIsP2pConnected = false
-                    mIsRequestingConnectionInfo=false
+                    //
+                    mIsRequestingConnectionInfo = false
                     return@requestConnectionInfo
                 }
                 if (!wifiP2pInfo.groupFormed) {
                     Log.e(TAG, "beginRequestConnectionInfo() wifiP2pInfo.groupFormed is false! ")
+                    //
                     mIsP2pConnected = false
-                    mIsRequestingConnectionInfo=false
+                    //
+                    mIsRequestingConnectionInfo = false
                     return@requestConnectionInfo
                 }
                 val address: String? = wifiP2pInfo.groupOwnerAddress.hostAddress
-                Log.i(TAG, "beginRequestConnectionInfo() groupOwnerAddress：${wifiP2pInfo.groupOwnerAddress}")
+                Log.i(
+                    TAG,
+                    "beginRequestConnectionInfo() groupOwnerAddress：${wifiP2pInfo.groupOwnerAddress}"
+                )
 
-                if(address==null){
+                if (address == null) {
+                    //
                     mIsP2pConnected = false
-                    mIsRequestingConnectionInfo=false
+                    //
+                    mIsRequestingConnectionInfo = false
                     return@requestConnectionInfo
                 }
                 //beginRequestConnectionInfo() 服务端IP地址：192.168.49.1
                 Log.i(TAG, "beginRequestConnectionInfo() 服务端IP地址：$address")
+                //远程设备的ip地址
+                //GroupOwner的ip地址
                 mRemoteDeviceHostAddress = address
-                mIsRequestingConnectionInfo=false
                 Toast.makeText(activity, "wifiP2p连接成功，服务器地址：$address", Toast.LENGTH_SHORT)
                     .show()
             }
